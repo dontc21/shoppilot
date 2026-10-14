@@ -218,6 +218,8 @@ Python 规则会独立拦截退款、投诉、赔偿、订单变更等高风险�
 
 详见 [开发日志](docs/development-log.md)。
 
+用于双选会讲解的项目介绍、架构、真实 Bug 案例、演示步骤和常见追问见 [面试准备](docs/interview-preparation.md)。
+
 ## 安全设计
 
 - 全局默认并保持 `SHOPPILOT_DRY_RUN=true`；关闭该变量也不能开启批量发送。
