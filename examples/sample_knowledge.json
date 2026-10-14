@@ -1,0 +1,49 @@
+{
+  "schema_version": 1,
+  "products": [
+    {
+      "id": "SIM-CUP-001",
+      "name": "星云随行杯（模拟商品）",
+      "material": "杯体为 304 不锈钢，杯盖为食品接触用聚丙烯",
+      "size": "模拟容量 500 毫升",
+      "description": "仅用于 ShopPilotBot 本地演示的虚构商品，不代表店铺真实在售商品。",
+      "source": "ShopPilotBot 模拟测试资料",
+      "updated_at": "2026-10-14T00:00:00+08:00",
+      "approved_for_reply": true,
+      "is_simulated": true
+    }
+  ],
+  "faqs": [
+    {
+      "id": "SIM-FAQ-001",
+      "product_id": "SIM-CUP-001",
+      "question": "星云随行杯是什么材质？",
+      "answer": "模拟资料显示，杯体为 304 不锈钢，杯盖为食品接触用聚丙烯。",
+      "source": "ShopPilotBot 模拟测试资料",
+      "updated_at": "2026-10-14T00:00:00+08:00",
+      "approved_for_reply": true,
+      "is_simulated": true
+    },
+    {
+      "id": "SIM-FAQ-002",
+      "product_id": "SIM-CUP-001",
+      "question": "星云随行杯有多大？",
+      "answer": "模拟资料中的容量为 500 毫升。",
+      "source": "ShopPilotBot 模拟测试资料",
+      "updated_at": "2026-10-14T00:00:00+08:00",
+      "approved_for_reply": true,
+      "is_simulated": true
+    }
+  ],
+  "policies": [
+    {
+      "id": "SIM-POLICY-001",
+      "title": "模拟资料使用边界",
+      "content": "该资料只用于本地功能测试，不能作为真实店铺退款、赔偿或质保承诺。",
+      "source": "ShopPilotBot 模拟测试资料",
+      "updated_at": "2026-10-14T00:00:00+08:00",
+      "approved_for_reply": false,
+      "is_simulated": true
+    }
+  ]
+}
