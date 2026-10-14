@@ -14,15 +14,15 @@ ShopPilotBot 是一个本地优先的 Python AI 电商客服项目，用于真�
 | 手动登录并复用本地用户目录 | 是 | 不适合单元测试 | 是 |
 | 从 `context.pages` 识别客服标签页 | 是 | 是 | 客服页地址已验证 |
 | 客服入口生命周期与网络诊断 | 是 | 脱敏函数已测试 | 是 |
-| 当前会话 DOM 探测 | 是 | 是 | 尚未完成 |
-| 买家/商家消息区分 | 是，等待真实选择器 | 部分 | 尚未完成 |
-| SQLite 跨重启去重 | 是 | 是 | 尚未完成真实消息验收 |
+| 当前会话 DOM 探测 | 是 | 是 | 是 |
+| 买家/商家消息区分 | 是 | 部分 | 买家消息读取成功，方向 DOM 已确认 |
+| SQLite 消息去重 | 是 | 是，含跨重启测试 | 持续轮询通过，跨重启未验收 |
 | 浏览器消息发送 | 否，代码强制拒绝 | 安全门禁已测试 | 未验证 |
 | DeepSeek Agent / Tool Calling | 否 | 否 | 未验证 |
 | 商品知识库 | 否 | 否 | 未验证 |
 | Tkinter 人工审核 | 否 | 否 | 未验证 |
 
-截至 2026-10-14，本地测试实际结果为 `13 passed`。这不能替代真实 B站客服消息读取验收。
+截至 2026-10-14，本地测试实际结果为 `14 passed`。真实平台已读取同一测试会话的两条不同买家消息；自动化测试仍不能替代尚未执行的真实跨重启验收。
 
 ## 技术栈
 
@@ -77,6 +77,8 @@ IncomingMessage
 python -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
 Copy-Item .env.example .env
+New-Item -ItemType Directory -Force .runtime | Out-Null
+Copy-Item config/selectors.example.json .runtime/bilibili_selectors.json
 ```
 
 默认使用 `channel="msedge"` 和项目专属的 `edge_bilibili_profile/`。它不会读取或修改日常使用的 Edge 用户配置。
@@ -97,7 +99,7 @@ Copy-Item .env.example .env
 4. 只保存该测试文本周围的脱敏结构和不含正文的 DOM 骨架。
 5. 等待人工确认定位器，然后在同一进程内转入当前会话只读监听。
 
-真实定位器确认后，后续可直接运行：
+仓库中的示例定位器来自 2026-10-14 的真实页面验证。复制到 `.runtime/` 后可直接运行：
 
 ```powershell
 .\.venv\Scripts\python.exe -m shoppilotbot.cli listen
@@ -121,7 +123,7 @@ Copy-Item .env.example .env
 - 首选：`conversation_key + 平台消息 ID`。
 - 回退：`conversation_key + 正文 + 平台时间 + 消息方向 + 同类消息出现序号`，再计算 SHA-256。
 
-回退方案不是仅按正文去重，但如果页面没有平台消息 ID，而且虚拟滚动改变历史消息的可见顺序，仍可能出现误判。真实 DOM 验收时会明确记录是否获得了稳定平台 ID。
+当前真实 DOM 未发现稳定的平台消息 ID，因此使用回退方案。它不是仅按正文去重，但如果虚拟滚动改变历史消息的可见顺序、平台时间缺失或格式变化，仍可能出现误判。
 
 ## 测试
 
@@ -141,7 +143,8 @@ Copy-Item .env.example .env
 ## 已知问题与限制
 
 - 曾观察到客服入口打开的新标签页停留在 `about:blank`。加入事件监听后再次测试时，popup、主 frame 导航和客服页面均正常加载，原问题未复现，根因尚未确定，不能视为已修复。
-- B站客服消息列表、方向和稳定消息 ID 的真实 DOM 定位仍在验收中。
+- 2026-10-14 已真实验证当前会话列表、正文、平台时间和消息方向定位器，但尚未发现稳定平台消息 ID；CSS Modules 类名可能随平台发布变化。
+- 同一运行进程中的持续轮询去重已真实验证；真实浏览器重启后的去重尚未验收。
 - 当前只读取店主已经打开的会话，不主动遍历或切换所有买家。
 - 平台页面更新可能导致定位器失效；页面状态无法确认时必须停止处理。
 - 尚未实现 Agent、知识库、人工审核和真实消息发送。

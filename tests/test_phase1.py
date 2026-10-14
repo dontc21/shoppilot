@@ -98,6 +98,15 @@ def test_listener_requires_a_login_state_marker(tmp_path: Path) -> None:
         BilibiliSelectors.load(selector_path)
 
 
+def test_verified_selector_example_is_loadable() -> None:
+    selector_path = Path(__file__).parents[1] / "config" / "selectors.example.json"
+    selectors = BilibiliSelectors.load(selector_path)
+
+    assert selectors.conversation_id_attribute == "data-mid"
+    assert selectors.message_items
+    assert selectors.self_message
+
+
 def test_safe_url_keeps_bilibili_hash_route_without_parameters() -> None:
     raw = "https://shop.bilibili.com/?token=secret#/customer/chat?access_token=secret"
     assert safe_url(raw) == "https://shop.bilibili.com/#/customer/chat"
