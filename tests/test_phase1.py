@@ -3,10 +3,15 @@ from pathlib import Path
 
 import pytest
 
-from shoppilotbot.bilibili import BilibiliShopAdapter
+from shoppilotbot.bilibili import (
+    BilibiliShopAdapter,
+    OneTimeTestSendPermit,
+    SendStatus,
+)
 from shoppilotbot.browser import (
     BrowserSafetyStop,
     IncomingMessage,
+    OutgoingMessageStore,
     ProcessedMessageStore,
     message_key,
     normalize_text,
@@ -19,6 +24,7 @@ from shoppilotbot.diagnostics import (
     sanitize_diagnostic_text,
     sanitize_diagnostic_value,
 )
+from shoppilotbot.stage2 import TEST_REPLY, confirmation_matches
 
 
 def make_message(*, conversation_key: str = "buyer-a") -> IncomingMessage:
@@ -105,6 +111,8 @@ def test_verified_selector_example_is_loadable() -> None:
     assert selectors.conversation_id_attribute == "data-mid"
     assert selectors.message_items
     assert selectors.self_message
+    assert selectors.message_input == "textarea#chat-textarea"
+    assert selectors.send_button
 
 
 def test_safe_url_keeps_bilibili_hash_route_without_parameters() -> None:
@@ -119,12 +127,66 @@ def test_verified_chat_url_uses_observed_main_document_path() -> None:
     assert not is_verified_chat_url("https://shop.bilibili.com/#/db/home")
 
 
-def test_bilibili_adapter_cannot_send_in_phase_one() -> None:
-    adapter = BilibiliShopAdapter(
-        object(), BilibiliSelectors(), dry_run=True  # type: ignore[arg-type]
-    )
-    with pytest.raises(BrowserSafetyStop, match="DRY_RUN"):
-        adapter.send_message("buyer-1", "测试回复")
+def test_test_send_permit_is_bound_and_one_time() -> None:
+    permit = OneTimeTestSendPermit.issue("conversation-1", "测试回复")
+    permit.consume("conversation-1", "测试回复")
+
+    with pytest.raises(BrowserSafetyStop, match="已经使用"):
+        permit.consume("conversation-1", "测试回复")
+
+
+def test_test_send_permit_rejects_other_conversation() -> None:
+    permit = OneTimeTestSendPermit.issue("conversation-1", "测试回复")
+
+    with pytest.raises(BrowserSafetyStop, match="会话不一致"):
+        permit.consume("conversation-2", "测试回复")
+
+
+def test_outgoing_store_blocks_duplicate_and_persists_status(tmp_path: Path) -> None:
+    path = tmp_path / "state.db"
+    store = OutgoingMessageStore(path)
+    request_key, reserved = store.reserve("conversation-1", "测试回复")
+    assert reserved is True
+    store.mark(request_key, "SENT")
+    store.close()
+
+    reopened = OutgoingMessageStore(path)
+    try:
+        same_key, reserved_again = reopened.reserve("conversation-1", "测试回复")
+        assert same_key == request_key
+        assert reserved_again is False
+        assert reopened.status(request_key) == "SENT"
+        stored = reopened.connection.execute(
+            "SELECT conversation_key, text_hash FROM outgoing_messages"
+        ).fetchone()
+        assert stored is not None
+        assert "conversation-1" not in stored
+        assert "测试回复" not in stored
+    finally:
+        reopened.close()
+
+
+def test_send_without_one_time_permit_is_dry_run() -> None:
+    adapter = BilibiliShopAdapter.__new__(BilibiliShopAdapter)
+    adapter._test_send_permit = None
+    adapter.current_conversation_id = lambda: "conversation-1"  # type: ignore[method-assign]
+
+    result = adapter.send_message("conversation-1", "测试回复")
+
+    assert result.status == SendStatus.DRY_RUN
+    assert "未填写输入框" in result.detail
+
+
+def test_stage_two_uses_a_fixed_short_test_reply() -> None:
+    assert TEST_REPLY == "ShopPilotBot 测试回复，请忽略。"
+    assert len(TEST_REPLY) <= 500
+
+
+def test_non_ascii_confirmation_phrase_can_be_compared() -> None:
+    expected = "SEND TEST 会话-123 ABCDEF"
+
+    assert confirmation_matches(expected, expected) is True
+    assert confirmation_matches("SEND TEST 会话-456 ABCDEF", expected) is False
 
 
 def test_diagnostic_url_removes_parameters_and_masks_ids() -> None:

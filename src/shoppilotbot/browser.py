@@ -104,6 +104,77 @@ class ProcessedMessageStore:
         self.connection.close()
 
 
+def outgoing_request_key(conversation_id: str, text: str) -> str:
+    """对目标会话和回复正文生成本地键，不在数据库中保存原值。"""
+    identity = f"{conversation_id}:{normalize_text(text)}"
+    return hashlib.sha256(identity.encode("utf-8")).hexdigest()
+
+
+class OutgoingMessageStore:
+    """持久化发送尝试；PREPARED/UNKNOWN/SENT 均禁止自动重试。"""
+
+    VALID_FINAL_STATES = {"ABORTED", "SENT", "UNKNOWN"}
+
+    def __init__(self, path: Path) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        self.connection = sqlite3.connect(path)
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS outgoing_messages (
+                request_key TEXT PRIMARY KEY,
+                conversation_key TEXT NOT NULL,
+                text_hash TEXT NOT NULL,
+                status TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+        self.connection.commit()
+
+    def reserve(self, conversation_id: str, text: str) -> tuple[str, bool]:
+        request_key = outgoing_request_key(conversation_id, text)
+        conversation_key = hashlib.sha256(conversation_id.encode("utf-8")).hexdigest()
+        text_hash = hashlib.sha256(normalize_text(text).encode("utf-8")).hexdigest()
+        now = datetime.now(UTC).isoformat()
+        before = self.connection.total_changes
+        self.connection.execute(
+            """
+            INSERT OR IGNORE INTO outgoing_messages
+                (request_key, conversation_key, text_hash, status, created_at, updated_at)
+            VALUES (?, ?, ?, 'PREPARED', ?, ?)
+            """,
+            (request_key, conversation_key, text_hash, now, now),
+        )
+        self.connection.commit()
+        return request_key, self.connection.total_changes > before
+
+    def mark(self, request_key: str, status: str) -> None:
+        if status not in self.VALID_FINAL_STATES:
+            raise ValueError(f"不支持的发送状态：{status}")
+        cursor = self.connection.execute(
+            """
+            UPDATE outgoing_messages
+            SET status = ?, updated_at = ?
+            WHERE request_key = ? AND status = 'PREPARED'
+            """,
+            (status, datetime.now(UTC).isoformat(), request_key),
+        )
+        self.connection.commit()
+        if cursor.rowcount != 1:
+            raise BrowserSafetyStop("发送记录状态不唯一，禁止继续或重试。")
+
+    def status(self, request_key: str) -> str | None:
+        row = self.connection.execute(
+            "SELECT status FROM outgoing_messages WHERE request_key = ?",
+            (request_key,),
+        ).fetchone()
+        return str(row[0]) if row else None
+
+    def close(self) -> None:
+        self.connection.close()
+
+
 def launch_browser(playwright: Playwright, settings: Settings) -> BrowserContext:
     """使用独立持久化目录；登录完全由店主在可见窗口中完成。"""
     settings.profile_dir.mkdir(parents=True, exist_ok=True)

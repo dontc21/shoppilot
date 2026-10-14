@@ -86,6 +86,8 @@ class BilibiliSelectors:
     message_time: str = ""
     message_id_attribute: str = ""
     self_message: str = ""
+    message_input: str = ""
+    send_button: str = ""
 
     @classmethod
     def load(cls, path: Path) -> "BilibiliSelectors":
@@ -107,6 +109,8 @@ class BilibiliSelectors:
             "message_items": selectors.message_items,
             "message_text": selectors.message_text,
             "self_message": selectors.self_message,
+            "message_input": selectors.message_input,
+            "send_button": selectors.send_button,
         }
         missing = [name for name, value in required.items() if not value.strip()]
         if not selectors.login_ready.strip() and not selectors.login_lost.strip():

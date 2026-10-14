@@ -13,5 +13,7 @@
   "message_text": "._text_qgvop_14",
   "message_time": "._time_tshfi_41",
   "message_id_attribute": "",
-  "self_message": "._wrap-reverse_187zc_10"
+  "self_message": "._wrap-reverse_187zc_10",
+  "message_input": "textarea#chat-textarea",
+  "send_button": "button._button_1ilo7_82"
 }
