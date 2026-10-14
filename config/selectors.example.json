@@ -1,0 +1,17 @@
+{
+  "frame_url_contains": "",
+  "login_ready": "",
+  "login_lost": ".login__main",
+  "chat_ready": "",
+  "conversation_items": "",
+  "active_conversation": "",
+  "conversation_name": "",
+  "conversation_id_attribute": "",
+  "unread_badge": "",
+  "active_conversation_name": "",
+  "message_items": "",
+  "message_text": "",
+  "message_time": "",
+  "message_id_attribute": "",
+  "self_message": ""
+}
