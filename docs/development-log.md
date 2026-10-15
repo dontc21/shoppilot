@@ -305,7 +305,41 @@ Python 3.11.9 下运行 `python -m pytest -q`，提交前结果更新为 `14 pas
 
 离线复核未发现需要修改已验收浏览器收发逻辑的确定性安全问题。面试材料严格区分自动化测试、真实 B站验收和真实 DeepSeek 模拟数据验收；尚未实现的自动回复及人工审核继续明确标记为未完成。
 
-## 9. 后续开发记录规范
+## 9. 公开仓库发布准备（2026-10-15）
+
+### 开发目标
+
+将当前受控原型发布到新的公开仓库 `dontc21/shoppilot`，同时保证项目说明与真实代码一致，并确认拟公开的文件及现有 Git 历史不包含敏感数据。
+
+### 安全检查与证据
+
+- 检查 `main` 可达的 6 个提交，未发现非空 DeepSeek 密钥、常见 GitHub/AWS Token、私钥标记或 Bearer Token。
+- 检查历史文件路径，未发现 `.env`、浏览器 Profile、`.runtime/`、运行数据库、日志、HAR、JSONL、截图或存储状态文件被提交。
+- 检查当前跟踪文件和历史文本，未发现手机号、身份证号等真实客户隐私模式。
+- `.env`、数据库和 `edge_bilibili_profile/` 等本地运行数据均保持原位且继续被忽略，没有为发布而删除登录状态。
+- 补充忽略调试截图、Trace、Cookie/Auth State 导出及 DOM/Page Snapshot 等常见敏感产物。
+- Codex Security 自动扫描尝试读取被忽略的 Edge 缓存文件时启动失败；没有重试、修改或删除浏览器 Profile。随后使用只读 Git 历史与文件模式扫描完成发布前检查。该工具限制不等同于发现安全漏洞。
+
+### 文档修改
+
+- README 将公开项目名统一为 ShopPilot，并说明内部 Python 包名仍为 `shoppilotbot`。
+- 新增 Mermaid 架构图和主要模块职责，明确浏览器消息流与 Agent 候选回复流尚未自动接通。
+- 明确当前为原型和测试阶段；代码没有使用 LangGraph，Agent 由 Python 编排受限的两轮 Tool Calling。
+- 保留真实 B站收发验收、模拟知识库和 DeepSeek 模拟问题验收的边界，不将未实现的自动回复或人工审核描述为已完成。
+
+### 测试结果
+
+- Python：3.11.9。
+- `python -m pip check`：`No broken requirements found.`。
+- `python -m pytest -q`：`37 passed in 0.36s`。
+- `python -m compileall -q src tests`：通过。
+- 发布检查确认本地 `.env` 中 `SHOPPILOT_DRY_RUN=true`；测试过程未启动 Playwright、未操作当前登录 Edge、未调用 DeepSeek API。
+
+### 当前状态
+
+目标公开仓库已经创建为空仓库，未初始化 README 或产生需要覆盖的远端提交。最终提交和非强制推送结果将在实际完成后以 Git 状态和远端引用核验；如推送失败，不将仓库标记为已发布。
+
+## 10. 后续开发记录规范
 
 1. 以“真实、可独立验证的功能”“重要 Bug”或“开发里程碑”为日志单位；合并同一功能的细微调整，避免按命令或工具调用记流水账。
 2. 功能记录应包含开发目标、核心文件或函数、技术原理、验证方式、真实测试结果和当前限制。

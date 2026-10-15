@@ -1,14 +1,14 @@
-# ShopPilotBot
+# ShopPilot
 
-ShopPilotBot 是一个本地优先的 Python AI 电商客服项目，用于真实店铺实验、计算机本科生学习和技术面试展示。当前接入目标是 **B站小店（哔哩哔哩商家后台）**。
+ShopPilot 是一个本地优先的 Python 电商客服智能回复原型，用于真实店铺实验、计算机本科生学习和技术面试展示。当前平台适配目标是 **B站小店（哔哩哔哩商家后台）**；Python 包名暂时保留为 `shoppilotbot`，以兼容已经验收的运行命令。
 
-项目坚持两个原则：平台 DOM 必须经过真实页面验证后才能使用；任何自动发送能力都必须在店主测试和明确启用后才可开放。当前 Agent 只处理人工输入的模拟问题并输出候选结果，不会调用浏览器发送消息。
+项目当前处于**受控原型和测试阶段**，不是大规模商用系统。它坚持两个原则：平台 DOM 必须经过真实页面验证后才能使用；任何发送能力都必须具备会话绑定、去重和人工授权。当前 Agent 只处理人工输入的模拟问题并输出候选结果，不会调用浏览器发送消息。
 
 ## 项目状态
 
 “已编写”“自动化测试通过”和“真实平台验证”是三个不同状态：
 
-| 功能 | 已编写 | 自动化测试 | 真实 B站验证 |
+| 功能 | 已编写 | 自动化测试 | 真实验收 |
 | --- | --- | --- | --- |
 | Playwright 启动独立持久化 Edge | 是 | 配置检查 | 是 |
 | 手动登录并复用本地用户目录 | 是 | 不适合单元测试 | 是 |
@@ -23,7 +23,7 @@ ShopPilotBot 是一个本地优先的 Python AI 电商客服项目，用于真�
 | SQLite 商品知识库 | 是 | 是 | 使用模拟数据完成本地验证 |
 | Tkinter 人工审核 | 否 | 否 | 未验证 |
 
-截至 2026-10-14，本地测试实际结果为 `37 passed`。真实平台已完成跨重启去重、买家/商家方向识别，以及一条固定测试回复的发送闭环。知识库和 Agent 已通过自动化测试，并使用模拟问题完成真实 DeepSeek API 验收；该验收没有使用真实买家数据。
+截至 2026-10-15，发布前离线测试实际结果为 `37 passed`。真实平台已完成跨重启去重、买家/商家方向识别，以及一条固定测试回复的发送闭环。知识库和 Agent 已通过自动化测试，并使用模拟问题完成真实 DeepSeek API 验收；该验收没有使用真实买家数据。
 
 ## 技术栈
 
@@ -36,44 +36,47 @@ ShopPilotBot 是一个本地优先的 Python AI 电商客服项目，用于真�
 
 运行依赖只有 Playwright 和 python-dotenv；测试依赖为 Pytest。仓库不包含第三方电商机器人业务代码，也不复制平台未公开接口。
 
+当前源码**没有使用 LangGraph**：Agent 是一个受限的两轮 Tool Calling 流程，直接由 Python 编排。这样更符合当前单机 MVP 的复杂度，也避免为了技术标签引入没有实际用途的框架。
+
 ## 当前架构
 
-```text
-Microsoft Edge（独立持久化配置）
-        │
-        ▼
-Playwright BrowserContext
-        │ 从 context.pages 选择已验证客服页
-        ▼
-BilibiliShopAdapter（只读当前会话）
-        │
-        ▼
-IncomingMessage
-        │
-        ├── 平台消息 ID ──────────────┐
-        └── 组合 SHA-256 回退指纹 ────┤
-                                      ▼
-                            SQLite 去重状态
-                                      │
-                                      ▼
-                              本地终端输出
+```mermaid
+flowchart LR
+    subgraph Browser[真实平台读取与受控发送]
+        Edge[独立持久化 Edge] --> PW[Playwright BrowserContext]
+        PW --> Adapter[BilibiliShopAdapter]
+        Adapter --> Msg[IncomingMessage]
+        Msg --> Dedup[(SQLite 消息去重)]
+        Adapter --> Guard[会话绑定 + 一次性发送门禁]
+    end
+
+    subgraph Agent[当前独立运行的候选回复流程]
+        Manual[人工输入模拟问题] --> DS1[DeepSeek Tool Calling]
+        DS1 --> Tool[search_knowledge]
+        Tool --> KB[(SQLite 商品 / FAQ / 规则)]
+        KB --> DS2[结构化候选回复]
+        DS2 --> Rules[Python 独立安全规则]
+        Rules --> Auto[AUTO_REPLY_CANDIDATE]
+        Rules --> Review[NEED_REVIEW]
+    end
+
+    Dedup -. 尚未自动接入 .-> DS1
+    Auto -. 不构成发送授权 .-> Guard
 ```
 
-计划中的完整流程是：
+浏览器消息流与 Agent 候选回复流目前保持隔离。这是刻意的安全边界：`AUTO_REPLY_CANDIDATE` 只表示通过证据和规则检查，不能直接触发真实发送。
 
-```text
-人工输入模拟问题 → DeepSeek Tool Calling → search_knowledge()
-                                              │
-                                        SQLite 知识库
-                                              │
-                                模型生成有引用的候选回复
-                                              │
-                                  Python 独立规则与证据检查
-                                      ┌───────┴────────┐
-                                      ▼                ▼
-                           AUTO_REPLY_CANDIDATE    NEED_REVIEW
-                           （只输出、不发送）       （只输出）
-```
+## 主要模块
+
+| 模块 | 职责 |
+| --- | --- |
+| `browser.py` | Edge 启动、消息模型、消息/发送状态 SQLite、脱敏 DOM |
+| `bilibili.py` | 当前会话识别、买家/商家方向判断、会话绑定发送 |
+| `chat_probe.py` / `diagnostics.py` | 客服页识别、popup/frame/Console/Network 脱敏诊断 |
+| `knowledge.py` | 商品、FAQ、售后规则导入与参数化 SQL 检索 |
+| `agent.py` | DeepSeek Tool Calling、结构化结果、Token 统计和独立决策 |
+| `agent_cli.py` | 仅针对人工输入模拟问题的本地 Agent 演示入口 |
+| `stage2.py` | 固定测试回复、DRY_RUN 预览和一次性人工授权 |
 
 ## 安装
 

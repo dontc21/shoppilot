@@ -30,4 +30,14 @@ playwright-report/
 test-results/
 playwright/.auth/
 output/playwright/
+screenshots/
+debug-screenshots/
+trace.zip
+*.trace.zip
+cookies*.json
+auth-state*.json
+dom-snapshot*
+page-snapshot*
+Thumbs.db
+.DS_Store
 storage-state*.json
